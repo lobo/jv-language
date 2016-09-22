@@ -1,0 +1,10 @@
+w("Factorial de: ")
+int:numero
+rl(numero)
+int:result = 1
+whl > numero 0
+	result = * result numero
+	numero = - numero 1
+
+w("El factorial es: ")
+wl(result)

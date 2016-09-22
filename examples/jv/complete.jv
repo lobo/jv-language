@@ -1,0 +1,73 @@
+~ NOTE: This is just to test the whole grammar parsing.
+~ Running this example won't work since functions aren't implemented
+
+~ Grammar check
+fn:int fibonacci int:n
+	if <= n 1
+		ret n
+	ret + fibonacci(- n 1) fibonacci(- n 2)
+
+fn help
+	w("This is a help command")
+
+fn:int ident int:var
+	ret var
+
+fn:int sum int:var1 int:var2
+	ret + var1 var2
+
+ident(3)
+sum(3, 5)
+
+w(+ ident(3) sum(3, 5))
+
+~ Write
+w("Hola mundo!")
+
+wl("Now testing variables")
+
+~ Tests int vars:
+int:int_var
+int_var = 3
+int:int_var2 = 4
+
+~ Tests boolean vars:
+bln:bln_var
+bln_var = YES
+bln:bln_var2 = NO
+
+~ Tests string vars
+str:str_var
+str_var = "Hola, mundo!"
+str:str_var2 = "Chau, mundo! :) ¬"
+
+rl(int_var)
+rl(bln_var)
+rl(str_var)
+
+w(int_var)
+wl(int_var2)
+w(bln_var)
+wl(bln_var2)
+w(str_var)
+wl(str_var2)
+
+
+int:i = 0
+
+whl < i 1000
+	if == % i 2 0
+		int_var2 = + int_var2 1
+	ls
+		int_var = - int_var 1
+
+
+if !< 4 2
+	wl("Tengo not menor!")
+ls
+	if !== 3 * 3 / 8 % 0 - 2 + 3 4 ~ Same as: if ( !( 3 == 3 * ( 8 / 0 % (2 - (3 + 4)))))
+		if && YES || NO < 5 3
+			whl YES
+				int:var_aux = 0
+				if == aux 300000
+					exit 1

@@ -1,0 +1,5 @@
+if YES
+    if NO
+        wl("Hello")
+    ls
+        wl("Bye")

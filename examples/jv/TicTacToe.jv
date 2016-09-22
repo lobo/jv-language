@@ -1,0 +1,267 @@
+~ NOTE: Doesn't work since we couldn't finish implementing functions with parameters
+
+
+~ Prints the board according to the variables passed to it
+fn:int print_board int:var1 int:var2 int:var3 int:var4 int:var5 int:var6 int:var7 int:var8 int:var9
+	
+	str:pos1
+	str:pos1
+	str:pos1
+	str:pos1
+	str:pos1
+	str:pos1
+	str:pos1
+	str:pos1
+	str:pos1
+
+	if == var1 1
+		pos1 = "X"
+	ls
+		if == var1 2
+			pos1 = "O"
+		ls
+			pos1 = " "
+
+	if == var2 1
+		pos2 = "X"
+	ls
+		if == var2 2
+			pos2 = "O"
+		ls
+			pos2 = " "
+
+	if == var3 1
+		pos3 = "X"
+	ls
+		if == var3 2
+			pos3 = "O"
+		ls
+			pos3 = " "
+
+	if == var4 1
+		pos4 = "X"
+	ls
+		if == var4 2
+			pos4 = "O"
+		ls
+			pos4 = " "
+
+	if == var5 1
+		pos5 = "X"
+	ls
+		if == var5 2
+			pos5 = "O"
+		ls
+			pos5 = " "
+
+	if == var6 1
+		pos6 = "X"
+	ls
+		if == var6 2
+			pos6 = "O"
+		ls
+			pos6 = " "
+
+	if == var7 1
+		pos7 = "X"
+	ls
+		if == var7 2
+			pos7 = "O"
+		ls
+			pos7 = " "
+
+	if == var8 1
+		pos8 = "X"
+	ls
+		if == var8 2
+			pos8 = "O"
+		ls
+			pos8 = " "
+
+	if == var9 1
+		pos9 = "X"
+	ls
+		if == var9 2
+			pos9 = "O"
+		ls
+			pos9 = " "
+	
+	wl(" ------------ ")
+	w("| ")
+	w(pos1)
+	w(" | ")
+	w(pos2)
+	w(" | ")
+	w(pos3)
+	wl(" |")
+
+	wl(" ------------ ")
+	w("| ")
+	w(pos4)
+	w(" | ")
+	w(pos5)
+	w(" | ")
+	w(pos6)
+	wl(" |")
+
+	wl(" ------------ ")
+	w("| ")
+	w(pos7)
+	w(" | ")
+	w(pos8)
+	w(" | ")
+	w(pos9)
+	wl(" |")
+
+	wl(" ------------ ")
+
+	ret 0
+
+
+fn:bln check_win int:var1 int:var2 int:var3 int:var4 int:var5 int:var6 int:var7 int:var8 int:var9
+
+	if && == var1 var2 == var2 var3
+		ret YES
+	if && == var4 var5 == var5 var6
+		ret YES
+	if && == var7 var8 == var8 var9
+		ret YES
+
+	if && == var1 var4 == var4 var7
+		ret YES
+	if && == var2 var5 == var5 var8
+		ret YES
+	if && == var3 var6 == var6 var9
+		ret YES
+
+	if && == var1 var5 == var5 var9
+		ret YES
+	if && == var3 var5 == var5 var7
+		ret YES
+	ret NO
+
+wl("Welcome to Tic Tac Toe")
+int:key = 0
+whl !== key 1
+	wl("Press 1 to start the game, or 2 for help, and then start")
+	int:key
+	rl(key)
+
+	if !== key 1
+		if == key 2
+			wl("Think the board as a telephone keyboard.")
+			wl("For example, to play the central position, press 5")
+			wl("Now starting the game...")
+			key = 1
+		ls
+			wl("Not a valid key!")
+
+
+wl("Let's play")
+wl("Player 1 is X, and player 2 is O")
+
+int:var1 = 0
+int:var2 = 0
+int:var3 = 0
+int:var4 = 0
+int:var5 = 0
+int:var6 = 0
+int:var7 = 0
+int:var8 = 0
+int:var9 = 0
+
+bln:game = YES
+int:player = 1
+int:other_player = 2
+bln:must_print = YES
+
+whl game
+
+	if must_print
+		w("Now turn of player ")
+		wl(player)
+		wl("")
+		print_board(var1, var2, var3, var4, var5, var6, var7, var8, var9)
+
+	must_print = YES
+	bln:valid_pos = NO
+	wl("Insert a number")
+	int:aux
+	rl(aux)
+
+	if == aux 1
+		if == var1 0
+			var1 = player
+			valid_pos = YES
+
+	if == aux 2
+		if == var2 0
+			var2 = player
+			valid_pos = YES
+
+	if == aux 3
+		if == var3 0
+			var3 = player
+			valid_pos = YES
+
+	if == aux 4
+		if == var4 0
+			var4 = player
+			valid_pos = YES
+
+	if == aux 5
+		if == var5 0
+			var5 = player
+			valid_pos = YES
+
+	if == aux 6
+		if == var6 0
+			var6 = player
+			valid_pos = YES
+
+	if == aux 7
+		if == var7 0
+			var7 = player
+			valid_pos = YES
+
+	if == aux 8
+		if == var8 0
+			var8 = player
+			valid_pos = YES
+
+	if == aux 9
+		if == var9 0
+			var9 = player
+			valid_pos = YES
+
+
+	if valid_pos
+		if check_win(var1, var2, var3, var4, var5, var6, var7, var8, var9)
+			game = NO
+		ls
+			int:swap = player
+			player = other_player
+			other_player = swap
+	ls
+		w("Position ")
+		w(aux)
+		w(" is already occupied by player ")
+		wl(player)
+		must_print = NO
+		wl("Insert a valid position!")
+
+
+w("The winner is player ")
+wl(player)
+wl("To play again, re-start the program")
+wl("Bye-bye!")
+
+
+
+
+
+
+
+
+
+

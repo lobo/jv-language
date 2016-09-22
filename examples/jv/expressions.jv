@@ -1,0 +1,41 @@
+~ Arithmetic
+~ Boolean
+wl(YES)
+wl(NO)
+w("'|| NO YES' expect 'true' ")
+wl(|| NO YES)
+w("'&& NO YES' expect 'false' ")
+wl(&& NO YES)
+w("'!YES' expect 'false' ")
+wl(!YES)
+w("'YES' expect 'true' ")
+wl(YES)
+w("'!NO' expect 'true' ")
+wl(!NO)
+~ String
+
+
+w("IF expect 'foo' ")
+if YES
+	wl("foo-in-if #1")
+ls
+	wl("bar-in-else #1")
+
+w("IF expect 'bar' ")
+if !YES
+	wl("foo-in-if #2")
+ls
+	wl("bar-in-else #2")
+
+w("'> 4 3' expect 'true' ")
+wl(> 4 3)
+w("'< 4 3' expect 'false' ")
+wl(< 4 3)
+w("'== 4 3' expect 'false' ")
+wl(== 4 3)
+
+~ TODO: no hay regla en la gramatica para strings
+~ w("'== "Hola" "Hola"' expect 'true' ")
+~ wl(== "Hola" "Hola")
+~ w("'== "Hola" "Mundo"' expect 'false' ")
+~ wl(== "Hola" "Mundo")

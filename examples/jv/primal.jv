@@ -1,0 +1,58 @@
+~ NOTE: There's an error running this example. It must be due to the bytecode generator making a mistake
+~ when trying to load a different local from the one being requested (Type mismatch).
+
+w("Ingrese el numero que quiere saber si es primo: ")
+int:nro
+rl(nro)
+
+if == nro 2
+	wl("Prime")
+	exit
+
+if || < nro 2 == % nro 2 0
+	wl("Not prime")
+	exit 1
+
+~ START int sqrt
+
+int:sqrt = 1
+
+~ Exponential search
+whl > nro * 4 * sqrt sqrt
+	sqrt = * 2 sqrt
+
+int:left = sqrt
+int:right = * 2 sqrt
+int:middle = 0
+
+bln:searching = YES
+~ Do the binary search over the range that is guaranteed to contain
+~ the integer square root.
+whl && searching < left right
+	middle = + left / - right left 2
+
+	if < * middle middle nro
+		left = + 1 middle
+	ls
+		if > * middle middle nro
+			right = - 1 middle
+		ls
+			searching = NO
+
+~ Correct the binary search "noise". This iterates no more than 3 times.
+int:nro_sqrt = + 1 middle
+
+whl > * nro_sqrt nro_sqrt nro
+	nro_sqrt = - nro_sqrt 1
+
+~ END sqrt
+
+int:i = 1
+whl < i nro_sqrt
+	i = + 2 i
+	if == 0 % nro i
+		wl("Not prime")
+		exit
+wl("Prime")
+
+

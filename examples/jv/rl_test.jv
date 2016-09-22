@@ -1,0 +1,17 @@
+int:v1
+w("Please enter a number: ")
+rl(v1)
+w("Your number was: ")
+wl(v1)
+
+bln:v2
+w("Please enter a boolean: ")
+rl(v2)
+w("Your boolean was: ")
+wl(v2)
+
+str:v3
+w("Please enter a String: ")
+rl(v3)
+w("Your string was: ")
+wl(v3)

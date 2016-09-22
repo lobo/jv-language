@@ -1,0 +1,12 @@
+~ NOTE: Doesn't work since we didn't finish implementing functions with parameters
+
+fn:int factorial int:numero
+	if || == numero 0 == numero 1
+		ret 1
+	ret * factorial(- n 1) n
+
+int:numero
+w("Factorial de :")
+rl(numero)
+w("El factorial es: ")
+wl(factorial(numero))

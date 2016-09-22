@@ -1,0 +1,558 @@
+package atlc;
+
+import java_cup.runtime.*;
+import atlc.FunctionTuple;
+import atlc.nodes.*;
+import atlc.expr.*;
+import atlc.var.*;
+import org.objectweb.asm.ClassWriter;
+import org.objectweb.asm.commons.Method;
+import org.objectweb.asm.Opcodes;
+import org.objectweb.asm.tree.*;
+import java.util.logging.Logger;
+import java.util.logging.Level;
+import org.objectweb.asm.Type;
+import java.util.List;
+import java.util.ArrayList;
+import java.util.function.Function;
+import java.util.function.Consumer;
+import org.objectweb.asm.Type;
+import java.lang.Runnable;
+
+parser code {:
+	public static final Logger l = Logger.getLogger("PARSER");
+	protected Context context;
+	protected ArithmeticFactory arithmeticFactory = new ArithmeticFactory();
+	protected LogicalFactory logicalFactory = new LogicalFactory();
+	protected StrExprFactory strExprFactory = new StrExprFactory();
+	protected VariableFactory varFactory = new VariableFactory();
+	protected FunctionFactory fnFactory = new FunctionFactory();
+	protected Runnable endCallback;
+
+	public Parser(Scanner scanner, SymbolFactory factory, ClassWriter classWriter, String className, Runnable endCallback) {
+		this(scanner, factory);
+		this.context = new Context(className, classWriter);
+		this.endCallback = endCallback;
+	}
+
+	public void syntax_error(Symbol s) {
+		System.err.println("Syntax error at " + s);
+		this.done_parsing();
+	}
+
+	public void report_fatal_error(String message) {
+	    System.err.println("Error parsing: " + message);
+	    this.done_parsing();
+	}
+:}
+
+terminal FUNC, RET, EXIT; // Functions
+terminal SP, INDENT, DEDENT, EOL; // Whitespace
+terminal Type TYPE;
+terminal String VAR_NAME;
+terminal READ_LINE, WRITE_LINE, WRITE; // IO
+terminal LPAREN, RPAREN, COMMA; // Function Invoke
+
+// Literals
+terminal Integer LIT_INT;
+terminal Boolean LIT_BOOL;
+terminal String  LIT_STR;
+
+terminal IF, ELSE;
+terminal DO, WHILE;
+
+terminal int MATH_BINOP;
+terminal int BOOL_BINOP;
+terminal int LOGIC_BINOP;
+terminal     LOGIC_UNOP_NOT;
+terminal     ASSIGN;
+terminal     Type ASSIGN_TYPE;
+
+non terminal program;
+non terminal Consumer<Context>              method_list;
+non terminal Consumer<Context>              method;
+non terminal List<Function<Context, Type>>  argument_list;
+non terminal Consumer<Context>              closure;
+non terminal Consumer<Context>              stmt_list;
+non terminal Consumer<Context>              stmt;
+non terminal Consumer<Context>              stmt_def_maybe_assign;
+non terminal Consumer<Context>              stmt_assign;
+non terminal Consumer<Context>              stmt_if_maybe_else;
+non terminal Consumer<Context>              stmt_while;
+non terminal Consumer<Context>              stmt_io;
+non terminal Consumer<Context>              stmt_return;
+non terminal Consumer<Context>              stmt_exit;
+non terminal Function<Context, Type>        expr;
+non terminal Function<Context, Type>        expr_bool;
+non terminal Function<Context, Type>        expr_int;
+non terminal Function<Context, Type>        expr_str;
+non terminal Function<Context, Type>        stmt_method_call;
+non terminal List<Function<Context, Type>>  method_argument_list;
+non terminal Function<Context, Type>        method_argument;
+non terminal FunctionTuple bin_arg;
+
+precedence left ELSE;
+precedence left SP;
+precedence left LPAREN;
+
+
+// ESTRUCTURA
+start with program;
+
+program
+	::= method_list:ml stmt_list:sl
+		{:
+			Parser.l.log(Level.INFO, "stmt_list -> PARSE COMPLETE!");
+			ml.accept(context);
+			context.start(Method.getMethod("void main (String[])"));
+			sl.accept(context);
+			context.endMethod();
+			context.getCw().visitEnd();
+			parser.endCallback.run();
+		:}
+;
+
+method_list
+	::= method:m method_list:ml
+		{:
+			Parser.l.log(Level.INFO, "method method_list -> method_list");
+			RESULT = m.andThen(ml);
+		:}
+	| // empty
+		{:
+			Parser.l.log(Level.INFO, "lambda -> method_list");
+			RESULT = context -> {};
+		:}
+;
+
+method
+	::= FUNC ASSIGN_TYPE TYPE:t SP VAR_NAME:n argument_list:p closure:c
+		{:
+			Parser.l.log(Level.INFO, "FUNC ASSIGN_TYPE TYPE SP VAR_NAME argument_list closure -> method");
+			RESULT = fnFactory.createFn(t, n, p, c);
+		:}
+	| FUNC SP VAR_NAME:n argument_list:p closure:c
+		{:
+			Parser.l.log(Level.INFO, "FUNC SP VAR_NAME argument_list closure -> method");
+			RESULT = fnFactory.createFn(n, p, c);
+		:}
+;
+
+argument_list
+	::= SP TYPE:type ASSIGN_TYPE VAR_NAME:name argument_list:pl
+		{:
+			Parser.l.log(Level.INFO, "SP TYPE ASSIGN_TYPE VAR_NAME argument_list -> argument_list");
+			pl.add(context -> {
+				varFactory.createLocal(name, type);
+				return type;
+			});
+			RESULT = pl;
+		:}
+	| // empty
+		{:
+			Parser.l.log(Level.INFO, "lambda -> argument_list");
+			RESULT = new ArrayList<>();
+		:}
+;
+
+stmt_list
+	::= stmt:s stmt_list:sl
+		{:
+			Parser.l.log(Level.INFO, "stmt stmt_list -> stmt_list ");
+			if (s == null) {
+			    throw new RuntimeException("Missing statement");
+			}
+			RESULT = s.andThen(sl);
+		:}
+	| // empty
+		{:
+			Parser.l.log(Level.INFO, "lambda -> stmt_list");
+			RESULT = context -> {};
+		:}
+;
+
+stmt
+	::= stmt_if_maybe_else:s
+		{:
+			Parser.l.log(Level.INFO, "stmt_if_maybe_else -> stmt");
+			RESULT = s;
+		:}
+	| stmt_while:s
+		{:
+			Parser.l.log(Level.INFO, "stmt_while -> stmt");
+			RESULT = s;
+		:}
+	| stmt_def_maybe_assign:s
+		{:
+			Parser.l.log(Level.INFO, "stmt_def_maybe_assign -> stmt");
+			RESULT = s;
+		:}
+	| stmt_assign:s
+		{:
+			Parser.l.log(Level.INFO, "stmt_assign -> stmt");
+			RESULT = s;
+		:}
+	| stmt_io:s
+		{:
+			Parser.l.log(Level.INFO, "stmt_io -> stmt");
+			RESULT = s;
+		:}
+	| stmt_return:s
+		{:
+			Parser.l.log(Level.INFO, "stmt_return -> stmt");
+			RESULT = s;
+		:}
+	| stmt_exit:s
+		{:
+			Parser.l.log(Level.INFO, "stmt_exit -> stmt");
+			RESULT = s;
+		:}
+	| stmt_method_call:s EOL
+		{:
+			Parser.l.log(Level.INFO, "stmt_method_call EOL -> stmt");
+			RESULT = s::apply;
+		:}
+;
+
+stmt_if_maybe_else
+	::= IF SP expr_bool:expr closure:cl
+		{:
+			Parser.l.log(Level.INFO, "IF SP expr_bool closure -> stmt_if_maybe_else");
+			RESULT = FlowControlFactory.createIf(expr, cl, null);
+		:}
+	| IF SP VAR_NAME:v1 closure:cl
+	    {:
+            Parser.l.log(Level.INFO, "IF SP VAR_NAME closure -> stmt_if_maybe_else");
+            RESULT = FlowControlFactory.createIf(varFactory.loadLocal(v1), cl, null);
+        :}
+    | IF SP stmt_method_call:mc closure:cl
+        {:
+            Parser.l.log(Level.INFO, "IF SP VAR_NAME closure -> stmt_if_maybe_else");
+            // TODO
+        :}
+	| IF SP expr_bool:expr closure:cl ELSE closure:ecl
+		{:
+			Parser.l.log(Level.INFO, "IF SP expr_bool closure ELSE closure -> stmt_if_maybe_else");
+			RESULT = FlowControlFactory.createIf(expr, cl, ecl);
+		:}
+    | IF SP VAR_NAME:v1 closure:cl ELSE closure:ecl
+        {:
+            Parser.l.log(Level.INFO, "IF SP VAR_NAME closure ELSE closure -> stmt_if_maybe_else");
+            RESULT = FlowControlFactory.createIf(varFactory.loadLocal(v1), cl, ecl);
+        :}
+    | IF SP stmt_method_call:mc closure:cl ELSE closure:ecl
+        {:
+            Parser.l.log(Level.INFO, "IF SP VAR_NAME closure ELSE closure -> stmt_if_maybe_else");
+            // TODO
+        :}
+;
+
+stmt_while
+	::= WHILE SP expr_bool:expr closure:cl
+		{:
+			Parser.l.log(Level.INFO, "WHILE SP expr_bool closure -> stmt_while");
+			RESULT = FlowControlFactory.createWhile(expr, cl);
+		:}
+	| WHILE SP VAR_NAME:v1 closure:cl
+        {:
+            Parser.l.log(Level.INFO, "WHILE SP VAR_NAME closure -> stmt_while");
+            RESULT = FlowControlFactory.createWhile(varFactory.loadLocal(v1), cl);
+        :}
+   | WHILE SP stmt_method_call:mc closure:cl
+       {:
+           Parser.l.log(Level.INFO, "WHILE SP VAR_NAME closure -> stmt_while");
+           // TODO
+       :}
+   | DO closure:cl WHILE SP expr_bool:expr EOL
+   		{:
+   			Parser.l.log(Level.INFO, "WHILE SP expr_bool closure -> stmt_while");
+   			RESULT = FlowControlFactory.createDoWhile(expr, cl);
+   		:}
+   | DO closure:cl WHILE SP VAR_NAME:v1 EOL
+        {:
+            Parser.l.log(Level.INFO, "WHILE SP VAR_NAME closure -> stmt_while");
+            RESULT = FlowControlFactory.createWhile(varFactory.loadLocal(v1), cl);
+        :}
+   | DO closure:cl WHILE SP stmt_method_call:mc EOL
+        {:
+            Parser.l.log(Level.INFO, "WHILE SP VAR_NAME closure -> stmt_while");
+          // TODO
+        :}
+;
+
+stmt_return
+	::= RET EOL
+		{:
+			Parser.l.log(Level.INFO, "RET EOL -> stmt_return");
+			// TODO
+		:}
+	| RET SP expr EOL
+		{:
+			Parser.l.log(Level.INFO, "RET SP expr EOL -> stmt_return");
+			// TODO
+		:}
+;
+
+stmt_exit
+	::= EXIT EOL
+		{:
+			Parser.l.log(Level.INFO, "EXIT EOL -> stmt_exit");
+			RESULT = context -> FunctionFactory.exit(context);
+		:}
+	| EXIT SP expr:e EOL
+		{:
+			Parser.l.log(Level.INFO, "EXIT SP expr EOL -> stmt_exit");
+			RESULT = context -> FunctionFactory.exit(context, e);
+		:}
+;
+
+stmt_def_maybe_assign
+	::= TYPE:type ASSIGN_TYPE VAR_NAME:name EOL
+		{:
+			Parser.l.log(Level.INFO, "TYPE ASSIGN_TYPE VAR_NAME EOL -> stmt_def_maybe_assign");
+			RESULT = varFactory.createLocal(name, type);
+		:}
+	| TYPE:type ASSIGN_TYPE VAR_NAME:name SP ASSIGN SP expr:value EOL
+		{:
+			Parser.l.log(Level.INFO, "TYPE ASSIGN_TYPE stmt_assign -> stmt_def_maybe_assign");
+			RESULT = varFactory.createLocal(name, type, value);
+		:}
+;
+
+stmt_method_call
+	::= VAR_NAME:v LPAREN method_argument_list:mal RPAREN
+		{:
+			Parser.l.log(Level.INFO, "VAR_NAME LPAREN method_argument_list RPAREN -> stmt_method_call");
+			RESULT = fnFactory.invokeFn(v, mal);
+		:}
+;
+
+method_argument_list
+	::= method_argument_list:mal method_argument:ma
+		{:
+			Parser.l.log(Level.INFO, "method_argument_list method_argument -> method_argument_list");
+			mal.add(ma);
+			RESULT = mal;
+		:}
+	| // empty
+		{:
+			Parser.l.log(Level.INFO, "lambda -> method_argument_list");
+            RESULT = new ArrayList<>();
+		:}
+;
+
+method_argument
+	::= expr:e COMMA SP
+		{:
+			Parser.l.log(Level.INFO, "expr COMMA SP -> method_argument");
+			RESULT = e;
+		:}
+	| expr:e
+		{:
+			Parser.l.log(Level.INFO, "expr -> method_argument");
+			RESULT = e;
+		:}
+;
+
+// TODO: ARRAY
+
+stmt_assign
+	::= VAR_NAME:name SP ASSIGN SP expr:value EOL
+		{:
+			Parser.l.log(Level.INFO, "VAR_NAME SP ASSIGN SP expr EOL -> stmt_assign");
+			RESULT = varFactory.assignLocal(name, value);
+		:}
+;
+
+stmt_io
+	::= READ_LINE LPAREN VAR_NAME:v1 RPAREN EOL
+		{:
+			Parser.l.log(Level.INFO, "READ_LINE SP VAR_NAME EOL -> stmt_io");
+			RESULT = context -> FunctionFactory.read(
+			    varFactory.getType(v1),
+			    varFactory.assignLocal(v1),
+			    context
+            );
+		:}
+	| WRITE_LINE LPAREN expr:e RPAREN EOL
+		{:
+			Parser.l.log(Level.INFO, "WRITE_LINE SP expr EOL -> stmt_io");
+			RESULT = context -> fnFactory.writeLine(e, context);
+		:}
+	| WRITE LPAREN expr:e RPAREN EOL
+		{:
+			Parser.l.log(Level.INFO, "WRITE SP expr EOL -> stmt_io");
+			RESULT = context -> fnFactory.write(e, context);
+		:}
+;
+
+expr
+	::= expr_bool:e
+		{:
+			Parser.l.log(Level.INFO, "expr_bool -> expr");
+			RESULT = e;
+		:}
+	| expr_int:e
+		{:
+			Parser.l.log(Level.INFO, "expr_int -> expr");
+			RESULT = e;
+		:}
+	| expr_str:e
+		{:
+			Parser.l.log(Level.INFO, "expr_str -> expr");
+			RESULT = e;
+		:}
+	| VAR_NAME:name
+		{:
+			Parser.l.log(Level.INFO, "VAR_NAME -> expr");
+			RESULT = varFactory.loadLocal(name);
+		:}
+	| stmt_method_call
+		{:
+			Parser.l.log(Level.INFO, "stmt_method_call -> expr");
+			// TODO;
+		:}
+;
+
+expr_bool
+	::= LIT_BOOL:lb
+		{:
+			Parser.l.log(Level.INFO, "LIT_BOOL -> expr_bool");
+			RESULT = logicalFactory.createLiteral(lb);
+		:}
+	| BOOL_BINOP:op SP bin_arg:ba
+		{:
+			Parser.l.log(Level.INFO, "BOOL_BINOP SP bin_arg -> expr_bool");
+			RESULT = logicalFactory.createBinary(op, ba.first, ba.second);
+		:}
+	| LOGIC_BINOP:op SP bin_arg:ba
+		{:
+			Parser.l.log(Level.INFO, "LOGIC_BINOP SP bin_arg -> expr_bool");
+			RESULT = arithmeticFactory.createBinary(op, ba.first, ba.second);
+		:}
+	| LOGIC_UNOP_NOT:op expr_bool:e
+		{:
+			Parser.l.log(Level.INFO, "LOGILOGIC_UNOP_NOT_UNOP expr_int -> expr_bool");
+			RESULT = logicalFactory.createNot(e);
+		:}
+	| LOGIC_UNOP_NOT stmt_method_call
+		{:
+			Parser.l.log(Level.INFO, "LOGILOGIC_UNOP_NOT_UNOP stmt_method_call -> expr_bool");
+			// TODO
+		:}
+	| LOGIC_UNOP_NOT VAR_NAME:v1
+		{:
+			Parser.l.log(Level.INFO, "LOGICLOGIC_UNOP_NOTUNOP VAR_NAME -> expr_bool");
+			RESULT = logicalFactory.createNot(varFactory.loadLocal(v1));
+		:}
+;
+
+expr_int
+	::= LIT_INT:li
+		{:
+			Parser.l.log(Level.INFO, "LIT_INT -> expr_int");
+			RESULT = arithmeticFactory.createLiteral(li);
+		:}
+	| MATH_BINOP:op SP bin_arg:ba
+		{:
+			Parser.l.log(Level.INFO, "MATH_BINOP SP bin_arg -> expr_int");
+			RESULT = arithmeticFactory.createBinary(op, ba.first, ba.second);
+		:}
+;
+
+expr_str
+	::= LIT_STR:ls
+		{:
+			Parser.l.log(Level.INFO, "LIT_STR -> expr_str");
+			RESULT = strExprFactory.createLiteral(ls);
+		:}
+;
+
+bin_arg
+    ::= VAR_NAME:v1 SP VAR_NAME:v2
+        {:
+            Parser.l.log(Level.INFO, "VAR_NAME SP VAR_NAME -> bin_arg");
+            RESULT = new FunctionTuple(varFactory.loadLocal(v1), varFactory.loadLocal(v2));
+        :}
+    | expr_int:e1 SP VAR_NAME:v1
+        {:
+            Parser.l.log(Level.INFO, "expr_int SP VAR_NAME -> bin_arg");
+            RESULT = new FunctionTuple(e1, varFactory.loadLocal(v1));
+        :}
+    | VAR_NAME:v1 SP expr_int:e1
+        {:
+            Parser.l.log(Level.INFO, "VAR_NAME SP expr_int -> bin_arg");
+            RESULT = new FunctionTuple(varFactory.loadLocal(v1), e1);
+        :}
+    | expr_int:e1 SP expr_int:e2
+        {:
+            Parser.l.log(Level.INFO, "expr_int SP expr_int -> bin_arg");
+            RESULT = new FunctionTuple(e1, e2);
+        :}
+    | expr_bool:e1 SP expr_bool:e2
+        {:
+            Parser.l.log(Level.INFO, "expr_bool SP expr_bool -> bin_arg");
+            RESULT = new FunctionTuple(e1, e2);
+        :}
+    | expr_bool:e1 SP VAR_NAME:v1
+        {:
+            Parser.l.log(Level.INFO, "expr_bool SP VAR_NAME -> bin_arg");
+            RESULT = new FunctionTuple(e1, varFactory.loadLocal(v1));
+        :}
+    | VAR_NAME:v1 SP expr_bool:e1
+        {:
+            Parser.l.log(Level.INFO, "VAR_NAME SP expr_bool -> bin_arg");
+            RESULT = new FunctionTuple(varFactory.loadLocal(v1), e1);
+        :}
+    | VAR_NAME:v1 SP stmt_method_call:mc
+        {:
+            Parser.l.log(Level.INFO, "VAR_NAME SP stmt_method_call -> bin_arg");
+            // TODO
+            RESULT = FunctionTuple.dummy();
+        :}
+    | stmt_method_call:mc SP VAR_NAME:v1
+        {:
+            Parser.l.log(Level.INFO, "stmt_method_call SP VAR_NAME -> bin_arg");
+            // TODO
+            RESULT = FunctionTuple.dummy();
+        :}
+    | stmt_method_call:mc SP expr_bool:e1
+        {:
+            Parser.l.log(Level.INFO, "stmt_method_call SP expr_bool -> bin_arg");
+            // TODO
+            RESULT = FunctionTuple.dummy();
+        :}
+    | stmt_method_call:mc SP expr_int:e1
+        {:
+            Parser.l.log(Level.INFO, "stmt_method_call SP expr_int -> bin_arg");
+            // TODO
+            RESULT = FunctionTuple.dummy();
+        :}
+    | expr_int:e1 SP stmt_method_call:mc
+        {:
+            Parser.l.log(Level.INFO, "expr_int SP stmt_method_call -> bin_arg");
+            // TODO
+            RESULT = FunctionTuple.dummy();
+        :}
+    | expr_bool:e1 SP stmt_method_call:mc
+        {:
+            Parser.l.log(Level.INFO, "expr_int SP stmt_method_call -> bin_arg");
+            // TODO
+            RESULT = FunctionTuple.dummy();
+        :}
+    | stmt_method_call:mc1 SP stmt_method_call:mc2
+        {:
+            Parser.l.log(Level.INFO, "stmt_method_call SP stmt_method_call -> bin_arg");
+            // TODO
+            RESULT = FunctionTuple.dummy();
+        :}
+;
+
+closure
+	::= EOL INDENT stmt_list:sl DEDENT
+		{:
+			Parser.l.log(Level.INFO, "EOL INDENT stmt_list DEDENT -> closure");
+			// TODO manage closure stack
+			RESULT = sl;
+		:}
+;

@@ -1,0 +1,24 @@
+~ NOTE: Doesn't work since we didn't finish implementing functions with parameters
+
+
+fn:int ipow_wrapper int:base int:exp
+	if < exp 0
+		ret - 0 1
+	ret ipow(base, exp)
+
+fn:int ipow int:base int:exp
+	if == exp 0
+		ret 1
+	ret * base ipow(base, - exp 1)
+
+
+wl("Exponentiation")
+wl("Insert the base")
+int:base
+rl(base)
+wl("Insert the exponent")
+int:exp
+rl(exp)
+int:result = ipow_wrapper(base, exp)
+w("Result: ")
+wl(result)

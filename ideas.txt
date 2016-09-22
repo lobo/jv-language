@@ -1,0 +1,12 @@
+Toda palabra reserva tiene 3 letras
+Toda linea termina con bara \n
+Los bloques se dan por \t
+
+ff-ls  	---> if-else
+
+
+dd-whl 		---> do-while
+
+mn			---> main
+
+rd-wr-nl-wv	---> read-write-newline-writevar
